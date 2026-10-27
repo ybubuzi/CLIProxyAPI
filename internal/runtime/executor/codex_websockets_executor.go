@@ -33,11 +33,12 @@ func NewCodexWebsocketsExecutor(cfg *config.Config) *CodexWebsocketsExecutor {
 	}
 }
 
-// CodexAutoExecutor routes Codex requests to the websocket transport only when:
-//  1. The downstream transport is websocket, and
-//  2. The selected auth enables websockets.
+// CodexAutoExecutor routes Codex requests to the websocket transport when the selected auth
+// enables websockets and either:
+//  1. the downstream transport is websocket, or
+//  2. force-upstream-websocket is enabled for the provider, so HTTP/SSE clients are upgraded too.
 //
-// For non-websocket downstream requests, it always uses the legacy HTTP implementation.
+// For other requests it uses the legacy HTTP implementation.
 type CodexAutoExecutor struct {
 	httpExec *CodexExecutor
 	wsExec   *CodexWebsocketsExecutor
@@ -48,6 +49,22 @@ func NewCodexAutoExecutor(cfg *config.Config) *CodexAutoExecutor {
 		httpExec: NewCodexExecutor(cfg),
 		wsExec:   NewCodexWebsocketsExecutor(cfg),
 	}
+}
+
+// useUpstreamWebsocket reports whether this request should use the websocket upstream.
+func (e *CodexAutoExecutor) useUpstreamWebsocket(ctx context.Context, auth *cliproxyauth.Auth) bool {
+	if !codexWebsocketsEnabled(auth) {
+		return false
+	}
+	if cliproxyexecutor.DownstreamWebsocket(ctx) {
+		return true
+	}
+	return e.forceUpstreamWebsocket()
+}
+
+// forceUpstreamWebsocket reports the provider setting that upgrades HTTP downstreams.
+func (e *CodexAutoExecutor) forceUpstreamWebsocket() bool {
+	return e != nil && e.httpExec != nil && e.httpExec.cfg != nil && e.httpExec.cfg.Codex.ForceUpstreamWebsocket
 }
 
 func (e *CodexAutoExecutor) Identifier() string { return "codex" }
@@ -75,7 +92,7 @@ func (e *CodexAutoExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth
 	if e == nil || e.httpExec == nil || e.wsExec == nil {
 		return cliproxyexecutor.Response{}, fmt.Errorf("codex auto executor: executor is nil")
 	}
-	if cliproxyexecutor.DownstreamWebsocket(ctx) && codexWebsocketsEnabled(auth) {
+	if e.useUpstreamWebsocket(ctx, auth) {
 		return e.wsExec.Execute(ctx, auth, req, opts)
 	}
 	if cliproxyexecutor.RequiredUpstreamWebsocket(ctx) {
@@ -88,7 +105,7 @@ func (e *CodexAutoExecutor) ExecuteStream(ctx context.Context, auth *cliproxyaut
 	if e == nil || e.httpExec == nil || e.wsExec == nil {
 		return nil, fmt.Errorf("codex auto executor: executor is nil")
 	}
-	if cliproxyexecutor.DownstreamWebsocket(ctx) && codexWebsocketsEnabled(auth) {
+	if e.useUpstreamWebsocket(ctx, auth) {
 		return e.wsExec.ExecuteStream(ctx, auth, req, opts)
 	}
 	if cliproxyexecutor.RequiredUpstreamWebsocket(ctx) {

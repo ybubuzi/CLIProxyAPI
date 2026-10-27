@@ -38,6 +38,7 @@ var v8SharedPaths = []configPath{
 	{"oauth.providers.codex.orphan-delegation-compatibility", "upstream.codex.orphan-delegation-compatibility"},
 	{"oauth.providers.codex.model-level-cooling", "upstream.codex.model-level-cooling"},
 	{"oauth.providers.codex.response-steering", "upstream.codex.response-steering"},
+	{"oauth.providers.codex.force-upstream-websocket", "upstream.codex.force-upstream-websocket"},
 	{"oauth.providers.codex.upstream-request-compression", "upstream.codex.upstream-request-compression"},
 	{"oauth.providers.codex.upstream-request-compression-min-bytes", "upstream.codex.upstream-request-compression-min-bytes"},
 	{"oauth.providers.codex.websocket-compression", "upstream.codex.websocket-compression"},
